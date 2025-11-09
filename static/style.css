@@ -1,0 +1,137 @@
+/* style.css - sederhana, adaptasi dari versi Streamlit UI */
+body {
+  font-family: "Poppins", sans-serif;
+  display: flex;
+  margin: 0;
+  background: linear-gradient(120deg, #e3f2fd 0%, #ffffff 100%);
+  color: #333;
+  transition: 0.3s;
+  min-height: 100vh;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 260px;
+  padding: 20px;
+  background-color: #fff;
+  border-right: 2px solid #eee;
+  height: 100vh;
+  box-sizing: border-box;
+}
+
+.sidebar h3 { margin-top: 0; }
+.tema button {
+  display:block; margin:8px 0; padding:8px; width:100%; border:none; border-radius:6px; cursor:pointer; background:#f0f0f0; font-weight:bold;
+}
+
+.upload-section { margin-top:20px; }
+#btnUpload { margin-top:8px; padding:8px 12px; background:#667eea; color:white; border:none; border-radius:6px; cursor:pointer; }
+
+/* Main */
+main { flex:1; padding:20px 40px; box-sizing:border-box; }
+.header { text-align:center; padding:25px; border-radius:15px; color:white; background:linear-gradient(90deg,#667eea 0%,#764ba2 100%); margin-bottom:25px; }
+
+.tabs { display:flex; gap:10px; margin-bottom:20px; }
+.tab { padding:10px 16px; border:none; border-radius:10px; background:#eee; cursor:pointer; font-weight:bold; }
+.tab.active { background:#667eea; color:white; }
+
+.tab-content { display:none; }
+.tab-content.active { display:block; }
+
+.table { width:100%; border-collapse:collapse; margin-top:12px; }
+.table th, .table td { border:1px solid #ddd; padding:8px; text-align:left; }
+.images-grid { display:flex; gap:14px; flex-wrap:wrap; margin-top:16px; }
+.images-grid img { max-width:360px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.1); }
+
+/* form */
+#prediksiForm { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+#prediksiForm input, #prediksiForm select { padding:8px; border-radius:6px; border:1px solid #ccc; }
+#prediksiForm button { padding:10px 16px; border-radius:6px; border:none; background:#667eea; color:white; cursor:pointer; }
+
+/* dark theme */
+body.dark { background: linear-gradient(120deg,#1f1c2c 0%, #928dab 100%); color:#f5f5f5; }
+body.dark .sidebar { background: rgba(33,33,33,0.9); color:#f5f5f5; }
+body.dark .tab { background:#444; color:white; }
+body.dark .tab.active { background:#764ba2; }
+body.dark .card, body.dark .table { background:#2c2c2c; color:white; }
+
+/* Tambahkan di bagian CSS */
+.feature-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    border: 1px solid #e9ecef;
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.feature-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+}
+
+.feature-rank {
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.feature-percentage h4 {
+    font-weight: 700;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+}
+
+.feature-name {
+    margin-top: auto;
+}
+
+.tree-feature-importance {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 12px;
+    margin: 15px 0;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.tree-feature-importance h6 {
+    color: white;
+    font-weight: 700;
+    margin-bottom: 10px;
+}
+
+.tree-feature-importance p {
+    color: rgba(255,255,255,0.9);
+    margin-bottom: 15px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .feature-card {
+        min-height: 100px;
+        padding: 15px 10px !important;
+    }
+    
+    .feature-percentage h4 {
+        font-size: 1.2rem;
+    }
+    
+    .tree-feature-importance {
+        padding: 15px;
+    }
+}
+
+@media (max-width: 576px) {
+    .col-6 {
+        padding-left: 5px;
+        padding-right: 5px;
+    }
+    
+    .feature-card {
+        min-height: 90px;
+        padding: 10px 8px !important;
+    }
+    
+    .feature-percentage h4 {
+        font-size: 1.1rem;
+    }
+}
