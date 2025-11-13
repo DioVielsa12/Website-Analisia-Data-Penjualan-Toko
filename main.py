@@ -1,11 +1,10 @@
 import io
-import os
 import base64
 import traceback
 import numpy as np
 from flask import Flask, render_template, request, jsonify
 import pandas as pd
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.model_selection import train_test_split
 from sklearn.tree import DecisionTreeClassifier, plot_tree
 from sklearn.naive_bayes import GaussianNB
@@ -21,6 +20,7 @@ app.config['MAX_CONTENT_LENGTH'] = 200 * 1024 * 1024  # 200 MB
 STATE = {
     "data": None,
     "label_encoders": {},
+    "scaler": None,
     "target_col": None,
     "X_columns": None,
     "dt_model": None,
@@ -135,7 +135,7 @@ def upload():
         df = pd.read_csv(file)
         STATE["data"] = df.copy()
 
-        # cari kolom target otomatis
+        # Cari kolom target otomatis
         target_col = None
         for col in df.columns:
             if col.lower() in ['label', 'keterangan', 'status', 'target', 'class', 'hasil']:
@@ -149,7 +149,7 @@ def upload():
         STATE["target_col"] = target_col
         print(f"Kolom target: {target_col}")
 
-        # Label encode
+        # Label encode hanya untuk kolom kategorikal
         encoders = {}
         df_enc = df.copy()
         for col in df_enc.columns:
@@ -159,18 +159,36 @@ def upload():
                 encoders[col] = le
         STATE["label_encoders"] = encoders
 
-        X = df_enc.drop(columns=[target_col])
+        # Pilih fitur spesifik 
+        selected_features = ['Harga', 'Terjual', 'Sisa', 'Diskon_(%)']
+        
+        # Cek jika fitur tersedia di dataset
+        available_features = [col for col in selected_features if col in df_enc.columns]
+        if len(available_features) < len(selected_features):
+            print(f"Warning: Beberapa fitur tidak ditemukan. Menggunakan yang tersedia: {available_features}")
+        
+        X = df_enc[available_features]
         y = df_enc[target_col]
-        STATE["X_columns"] = list(X.columns)
+        STATE["X_columns"] = available_features
 
-        print(f"Features: {STATE['X_columns']}")
+        print(f"Selected Features: {STATE['X_columns']}")
         print(f"Target classes: {y.unique()}")
 
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(X)
+        STATE["scaler"] = scaler
+
+        X_train, X_test, y_train, y_test = train_test_split(
+            X_scaled, y, test_size=0.3, random_state=42
+        )
         STATE.update({"X_train": X_train, "X_test": X_test, "y_train": y_train, "y_test": y_test})
 
-        # Model Decision Tree
-        dt = DecisionTreeClassifier(random_state=42)
+        # Model Decision Tree dengan parameter 
+        dt = DecisionTreeClassifier(
+            criterion='entropy',   
+            max_depth=5,           
+            random_state=42
+        )
         dt.fit(X_train, y_train)
         STATE["dt_model"] = dt
 
@@ -208,8 +226,8 @@ def upload():
         fig_nb_cm = fig_to_base64(fig2)
 
         # Struktur Decision Tree
-        fig3, ax3 = plt.subplots(figsize=(10, 6))
-        plot_tree(dt, filled=True, rounded=True, feature_names=list(X.columns),
+        fig3, ax3 = plt.subplots(figsize=(15, 8))
+        plot_tree(dt, filled=True, rounded=True, feature_names=available_features,
                   class_names=[str(c) for c in sorted(y.unique())], fontsize=8, ax=ax3)
         ax3.set_title("Decision Tree Structure")
         fig_tree = fig_to_base64(fig3)
@@ -262,10 +280,10 @@ def upload():
         print(f"Decision Tree classes count: {len(detailed_metrics['decision_tree']['classes'])}")
         print(f"Naive Bayes classes count: {len(detailed_metrics['naive_bayes']['classes'])}")
 
-        sample_html = df.head(10).to_html(classes="table table-striped", index=False)
+        sample_html = df.head(5).to_html(classes="table table-striped", index=False)
 
         response_data = {
-            "message": f"Berhasil memproses file! Dataset: {len(df)} sampel, {len(X.columns)} fitur",
+            "message": f"Berhasil memproses file! Dataset: {len(df)} sampel, {len(available_features)} fitur",
             "sample_table": sample_html,
             "metrics": {
                 "decision_tree": {
@@ -283,9 +301,9 @@ def upload():
                 "nb_confusion": fig_nb_cm,
                 "tree_plot": fig_tree
             },
-            "columns": STATE["X_columns"],
+            "columns": available_features,
             "target_column": target_col,
-            "is_binary_classification": cm_dt.shape == (2, 2)  # Tambahkan info jenis klasifikasi
+            "is_binary_classification": cm_dt.shape == (2, 2)
         }
 
         print("Response data keys:", response_data.keys())
@@ -305,35 +323,44 @@ def predict():
         if STATE["dt_model"] is None or STATE["nb_model"] is None:
             return jsonify({"error": "Model belum dilatih. Upload dataset terlebih dahulu."}), 400
 
-        cols = STATE["X_columns"]
+        # Ambil features yang digunakan untuk training
+        features = STATE["X_columns"]
+        scaler = STATE["scaler"]
+        
+        # Siapkan data input
+        row_data = []
+        for feature in features:
+            val = payload.get(feature, 0)
+            # Konversi ke float, default 0 jika kosong
+            try:
+                row_data.append(float(val) if val != "" else 0.0)
+            except (ValueError, TypeError):
+                row_data.append(0.0)
+        
+        # Scaling data input seperti saat training
+        X_new_scaled = scaler.transform([row_data])
+        
+        # Prediksi
+        pred_dt = STATE["dt_model"].predict(X_new_scaled)[0]
+        pred_nb = STATE["nb_model"].predict(X_new_scaled)[0]
+
+        # Decode label jika ada encoder untuk target
+        target_col = STATE["target_col"]
         encoders = STATE["label_encoders"]
-        row = {}
-
-        for c in cols:
-            val = payload.get(c, "")
-            if c in encoders:
-                le = encoders[c]
-                try:
-                    row[c] = le.transform([str(val)])[0]
-                except Exception:
-                    row[c] = 0
-            else:
-                row[c] = float(val) if val != "" else 0
-
-        X_new = pd.DataFrame([row], columns=cols)
-        pred_dt = STATE["dt_model"].predict(X_new)[0]
-        pred_nb = STATE["nb_model"].predict(X_new)[0]
-
-        target = STATE["target_col"]
-        if target in encoders:
-            pred_dt_label = encoders[target].inverse_transform([int(pred_dt)])[0]
-            pred_nb_label = encoders[target].inverse_transform([int(pred_nb)])[0]
+        
+        if target_col in encoders:
+            pred_dt_label = encoders[target_col].inverse_transform([int(pred_dt)])[0]
+            pred_nb_label = encoders[target_col].inverse_transform([int(pred_nb)])[0]
         else:
             pred_dt_label = str(pred_dt)
             pred_nb_label = str(pred_nb)
 
         return jsonify({
-            "prediction": {"decision_tree": pred_dt_label, "naive_bayes": pred_nb_label}
+            "prediction": {
+                "decision_tree": pred_dt_label, 
+                "naive_bayes": pred_nb_label
+            },
+            "input_features": dict(zip(features, row_data))
         })
 
     except Exception as e:
@@ -341,5 +368,4 @@ def predict():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    app.run(debug=True, port=8501)
